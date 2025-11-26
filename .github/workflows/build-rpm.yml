@@ -95,25 +95,30 @@ jobs:
 
       - name: Create systemd service file for RPM
         run: |
-          cat > ~/rpmbuild/SOURCES/drata-agent.service << 'EOF'
-          [Unit]
-          Description=Drata Agent
-          After=network.target
-          
-          [Service]
-          Type=simple
-          ExecStart=/usr/bin/drata-agent daemon
-          Restart=always
-          RestartSec=10
-          
-          [Install]
-          WantedBy=multi-user.target
-          EOF
+          SERVICE_FILE=~/rpmbuild/SOURCES/drata-agent.service
+          echo "[Unit]" > $SERVICE_FILE
+          echo "Description=Drata Agent" >> $SERVICE_FILE
+          echo "After=network.target" >> $SERVICE_FILE
+          echo "" >> $SERVICE_FILE
+          echo "[Service]" >> $SERVICE_FILE
+          echo "Type=simple" >> $SERVICE_FILE
+          echo "ExecStart=/usr/bin/drata-agent daemon" >> $SERVICE_FILE
+          echo "Restart=always" >> $SERVICE_FILE
+          echo "RestartSec=10" >> $SERVICE_FILE
+          echo "" >> $SERVICE_FILE
+          echo "[Install]" >> $SERVICE_FILE
+          echo "WantedBy=multi-user.target" >> $SERVICE_FILE
 
       - name: Copy binaries to SOURCES
         run: |
           cp cli/build/drata-agent-linux-amd64 ~/rpmbuild/SOURCES/
           cp lib/linux/bin/osqueryi ~/rpmbuild/SOURCES/
+
+      - name: Debug - Show spec file content
+        run: |
+          echo "=== RPM Spec File Content ==="
+          cat ~/rpmbuild/SPECS/drata-agent.spec
+          echo "=== End Spec File ==="
 
       - name: Build RPM package
         run: |
