@@ -1,0 +1,127 @@
+name: Build RPM Package
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'cli/**'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'cli/**'
+  workflow_dispatch:
+
+jobs:
+  build-rpm:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          dnf install -y golang rpm-build rpmdevtools
+
+      - name: Set up RPM build environment
+        run: |
+          rpmdev-setuptree
+
+      - name: Build Linux AMD64 binary
+        working-directory: cli
+        run: |
+          go mod download
+          go mod tidy
+          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=3.9.0-cli" -o build/drata-agent-linux-amd64 .
+          chmod +x build/drata-agent-linux-amd64
+
+      - name: Create RPM spec file
+        run: |
+          cat > ~/rpmbuild/SPECS/drata-agent.spec << 'EOF'
+          Name:           drata-agent
+          Version:        3.9.0
+          Release:        1%{?dist}
+          Summary:        Drata Agent CLI for SOC 2 compliance monitoring
+          
+          License:        Apache-2.0
+          URL:            https://drata.com
+          Source0:        drata-agent-linux-amd64
+          Source1:        drata-agent.service
+          
+          BuildArch:      x86_64
+          Requires:       systemd
+          
+          %description
+          The Drata Agent CLI is a command-line version of the Drata Agent
+          that monitors your system's security configuration for SOC 2 compliance.
+          It collects read-only information about your system's security settings
+          including screensaver locking, password manager, antivirus software,
+          and automatic updates.
+          
+          %install
+          mkdir -p %{buildroot}%{_bindir}
+          mkdir -p %{buildroot}%{_unitdir}
+          install -m 755 %{SOURCE0} %{buildroot}%{_bindir}/drata-agent
+          install -m 644 %{SOURCE1} %{buildroot}%{_unitdir}/drata-agent.service
+          
+          %files
+          %{_bindir}/drata-agent
+          %{_unitdir}/drata-agent.service
+          
+          %post
+          %systemd_post drata-agent.service
+          echo "Drata Agent installed successfully."
+          echo "To register: drata-agent register YOUR_TOKEN --region NA"
+          echo "To start daemon: systemctl enable --now drata-agent"
+          
+          %preun
+          %systemd_preun drata-agent.service
+          
+          %postun
+          %systemd_postun_with_restart drata-agent.service
+          
+          %changelog
+          * $(date "+%a %b %d %Y") Drata Inc <support@drata.com> - 3.9.0-1
+          - Initial RPM release of Drata Agent CLI
+          EOF
+
+      - name: Create systemd service file for RPM
+        run: |
+          cat > ~/rpmbuild/SOURCES/drata-agent.service << 'EOF'
+          [Unit]
+          Description=Drata Agent
+          After=network.target
+          
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/drata-agent daemon
+          Restart=always
+          RestartSec=10
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+      - name: Copy binary to SOURCES
+        run: |
+          cp cli/build/drata-agent-linux-amd64 ~/rpmbuild/SOURCES/
+
+      - name: Build RPM package
+        run: |
+          rpmbuild -bb ~/rpmbuild/SPECS/drata-agent.spec
+          
+          # List built RPMs
+          ls -la ~/rpmbuild/RPMS/x86_64/
+
+      - name: Copy RPM to workspace
+        run: |
+          cp ~/rpmbuild/RPMS/x86_64/*.rpm .
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: drata-agent-rpm-amd64
+          path: "*.rpm"
+          retention-days: 30
