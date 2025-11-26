@@ -40,7 +40,7 @@ jobs:
       - name: Create RPM spec file
         run: |
           CHANGELOG_DATE=$(date "+%a %b %d %Y")
-          cat > ~/rpmbuild/SPECS/drata-agent.spec << EOF
+          cat > ~/rpmbuild/SPECS/drata-agent.spec << 'SPEC_EOF'
           Name:           drata-agent
           Version:        3.9.0
           Release:        1%{?dist}
@@ -88,9 +88,10 @@ jobs:
           %systemd_postun_with_restart drata-agent.service
           
           %changelog
-          * ${CHANGELOG_DATE} Drata Inc <support@drata.com> - 3.9.0-1
-          - Initial RPM release of Drata Agent CLI
-          EOF
+          SPEC_EOF
+          # Append changelog with proper date (outside heredoc to allow variable expansion)
+          echo "* ${CHANGELOG_DATE} Drata Inc <support@drata.com> - 3.9.0-1" >> ~/rpmbuild/SPECS/drata-agent.spec
+          echo "- Initial RPM release of Drata Agent CLI" >> ~/rpmbuild/SPECS/drata-agent.spec
 
       - name: Create systemd service file for RPM
         run: |
