@@ -87,7 +87,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 	// Location Services
 	if output, err := c.RunCommand("gsettings get org.gnome.system.location enabled"); err == nil {
 		rawResults["locationServices"] = map[string]interface{}{
-			"commandsResults": output,
+			"commandResults": output,
 		}
 	}
 

@@ -134,6 +134,9 @@ func (c *Client) RunQuery(query string) ([]map[string]interface{}, error) {
 }
 
 // RunCommand executes a shell command and returns the output.
+// SECURITY NOTE: This method should only be called with trusted, predefined commands
+// from the platform-specific system query implementations (macos.go, linux.go, windows.go).
+// Commands are hardcoded system utilities and should never include user input.
 func (c *Client) RunCommand(command string) (string, error) {
 	var cmd *exec.Cmd
 

@@ -1,5 +1,7 @@
 package osquery
 
+import "strings"
+
 // getMacOSSystemInfo collects macOS-specific system information.
 func (c *Client) getMacOSSystemInfo(version string) (*QueryResult, error) {
 	rawResults := make(map[string]interface{})
@@ -66,7 +68,7 @@ func (c *Client) getMacOSSystemInfo(version string) (*QueryResult, error) {
 	// Auto Update
 	if output, err := c.RunCommand("softwareupdate --schedule"); err == nil {
 		value := "0"
-		if containsIgnoreCase(output, "turned on") {
+		if strings.Contains(strings.ToLower(output), "turned on") {
 			value = "1"
 		}
 		rawResults["autoUpdateEnabled"] = map[string]interface{}{
@@ -140,30 +142,4 @@ func (c *Client) getMacOSDeviceIdentifiers() (*AgentDeviceIdentifiers, error) {
 	}
 
 	return identifiers, nil
-}
-
-// containsIgnoreCase checks if a string contains a substring (case insensitive).
-func containsIgnoreCase(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || containsLower(toLower(s), toLower(substr)))
-}
-
-func containsLower(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-func toLower(s string) string {
-	b := make([]byte, len(s))
-	for i := range s {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
 }
