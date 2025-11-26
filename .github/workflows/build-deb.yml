@@ -45,9 +45,14 @@ jobs:
           mkdir -p ${PKG_DIR}/usr/bin
           mkdir -p ${PKG_DIR}/usr/share/doc/${PKG_NAME}
           mkdir -p ${PKG_DIR}/lib/systemd/system
+          mkdir -p ${PKG_DIR}/usr/lib/drata-agent/bin
           
           # Copy binary
           cp cli/build/drata-agent-linux-amd64 ${PKG_DIR}/usr/bin/drata-agent
+          
+          # Copy osquery binary
+          cp lib/linux/bin/osqueryi ${PKG_DIR}/usr/lib/drata-agent/bin/osqueryi
+          chmod +x ${PKG_DIR}/usr/lib/drata-agent/bin/osqueryi
           
           # Create control file
           cat > ${PKG_DIR}/DEBIAN/control << EOF

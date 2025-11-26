@@ -62,14 +62,18 @@ jobs:
               buildsystem: simple
               build-commands:
                 - install -Dm755 drata-agent-linux-amd64 /app/bin/drata-agent
+                - install -Dm755 osqueryi /app/lib/drata-agent/bin/osqueryi
               sources:
                 - type: file
                   path: drata-agent-linux-amd64
+                - type: file
+                  path: osqueryi
           EOF
 
-      - name: Copy binary to flatpak build directory
+      - name: Copy binaries to flatpak build directory
         run: |
           cp cli/build/drata-agent-linux-amd64 flatpak-build/
+          cp lib/linux/bin/osqueryi flatpak-build/
 
       - name: Build Flatpak
         working-directory: flatpak-build
