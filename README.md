@@ -10,6 +10,74 @@ The Drata Agent is a lightweight application that lives in your computer's toolb
 - [Electron Builder](https://www.electron.build/)
 - [osquery](https://www.osquery.io/)
 
+# Linux CLI Application
+
+For Linux users who prefer a command-line interface or need to run the agent in headless environments, a CLI version is available.
+
+## Build CLI
+
+```bash
+# Install dependencies
+yarn install --ignore-engines
+
+# Build the CLI for production
+yarn build:cli
+
+# The CLI binary will be at dist/cli.js
+```
+
+## CLI Usage
+
+The CLI stores configuration in `~/.drata-agent/config.json`.
+
+### Available Commands
+
+```bash
+# Configure and register the agent (interactive)
+node dist/cli.js configure
+
+# Run a manual sync
+node dist/cli.js sync
+
+# Show agent status
+node dist/cli.js status
+
+# Show debug information
+node dist/cli.js debug
+
+# Disconnect and clear configuration
+node dist/cli.js disconnect
+
+# Show help
+node dist/cli.js --help
+
+# Show version
+node dist/cli.js --version
+```
+
+### First-time Setup
+
+1. Build the CLI using `yarn build:cli`
+2. Run `node dist/cli.js configure`
+3. Enter your registration token from Drata (found in My Drata → Install the Drata Agent → Register Drata Agent)
+4. Select your region (NA, EU, or APAC)
+
+### Running as a Scheduled Task
+
+To run the CLI periodically (e.g., via cron), use the sync command:
+
+```bash
+# Example crontab entry to sync every 4 hours
+0 */4 * * * /usr/bin/node /path/to/dist/cli.js sync
+```
+
+### Environment Variables
+
+- `TARGET_ENV`: Target environment (LOCAL, DEV, QA, PROD). Defaults to PROD.
+- `DEBUG`: Set to any value to enable debug logging.
+- `CLI_PACKAGED`: Set to 'true' when running from a packaged binary.
+- `CLI_OSQUERYI_PATH`: Custom path to osqueryi binary.
+
 # Run or Build Drata Agent on Mac
 
 ## Caveats

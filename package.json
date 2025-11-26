@@ -10,6 +10,8 @@
     "scripts": {
         "prebuild": "rimraf dist",
         "build": "webpack --mode=production --env targetEnv=LOCAL",
+        "build:cli": "webpack --config webpack.cli.js --mode=production --env targetEnv=PROD",
+        "build:cli:dev": "webpack --config webpack.cli.js --mode=development --env targetEnv=LOCAL",
         "react:dev": "webpack serve --mode=development",
         "electron:dev": "nodemon",
         "start": "yarn dev:prepare:macos && concurrently --kill-others --names \"REND,MAIN\" \"yarn react:dev\" \"yarn electron:dev\"",
@@ -169,6 +171,7 @@
         "@electron/notarize": "^3.1.0",
         "@formatjs/cli": "^6.7.4",
         "@formatjs/intl": "^3.1.8",
+        "@inquirer/prompts": "^7.5.1",
         "@redux-devtools/extension": "^3.3.0",
         "@reduxjs/toolkit": "^2.9.0",
         "@types/auto-launch": "^5.0.5",
