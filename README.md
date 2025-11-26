@@ -2,8 +2,31 @@
 
 The Drata Agent is a lightweight application that lives in your computer's toolbar. This application is granted READ ONLY access to your system preferences to help ensure proper security configurations are set - such as screensaver locking, password manager, antivirus software and automatic updates are enabled. These security configurations are required for SOC 2 compliance.
 
+## CLI Version
+
+A command-line interface (CLI) version of the Drata Agent is available in the `cli/` directory. The CLI version is written in Go and can be compiled for any platform. See [cli/README.md](cli/README.md) for more information.
+
+### Quick Start (CLI)
+
+```bash
+cd cli
+
+# Build
+make build
+
+# Register
+./build/drata-agent register YOUR_TOKEN --region NA
+
+# Sync
+./build/drata-agent sync
+
+# Run as daemon
+./build/drata-agent daemon
+```
+
 ## See also
 
+- [CLI Documentation](cli/README.md)
 - [Drata Help](https://help.drata.com/)
 - [Automatic Upgrades Channel Repository](https://github.com/drata/agent-releases)
 - [Electron](https://www.electronjs.org/)
