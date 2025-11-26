@@ -1,127 +1,153 @@
-name: Build RPM Package
+name: Build and Release Linux CLI RPM
 
 on:
   push:
-    branches: [main, master]
-    paths:
-      - 'cli/**'
-  pull_request:
-    branches: [main, master]
-    paths:
-      - 'cli/**'
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 3.9.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
   build-rpm:
     runs-on: ubuntu-latest
-    container:
-      image: fedora:latest
     
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
-        run: |
-          dnf install -y golang rpm-build rpmdevtools
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: yarn
 
-      - name: Set up RPM build environment
-        run: |
-          rpmdev-setuptree
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
-      - name: Build Linux AMD64 binary
-        working-directory: cli
+      - name: Build CLI
+        run: yarn build:cli
+
+      - name: Get version
+        id: get_version
         run: |
-          go mod download
-          go mod tidy
-          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=3.9.0-cli" -o build/drata-agent-linux-amd64 .
-          chmod +x build/drata-agent-linux-amd64
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref_name }}" == v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Install RPM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm rpmlint
+
+      - name: Create RPM build structure
+        run: |
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          
+          # Create source tarball
+          mkdir -p drata-agent-cli-${{ steps.get_version.outputs.version }}
+          cp dist/cli.js drata-agent-cli-${{ steps.get_version.outputs.version }}/
+          cp lib/linux/bin/osqueryi drata-agent-cli-${{ steps.get_version.outputs.version }}/
+          cp README.md drata-agent-cli-${{ steps.get_version.outputs.version }}/
+          cp LICENSE drata-agent-cli-${{ steps.get_version.outputs.version }}/
+          
+          tar -czvf ~/rpmbuild/SOURCES/drata-agent-cli-${{ steps.get_version.outputs.version }}.tar.gz \
+            drata-agent-cli-${{ steps.get_version.outputs.version }}
 
       - name: Create RPM spec file
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          REPO: ${{ github.repository }}
         run: |
-          cat > ~/rpmbuild/SPECS/drata-agent.spec << 'EOF'
-          Name:           drata-agent
-          Version:        3.9.0
+          cat > ~/rpmbuild/SPECS/drata-agent-cli.spec << EOF
+          Name:           drata-agent-cli
+          Version:        ${VERSION}
           Release:        1%{?dist}
-          Summary:        Drata Agent CLI for SOC 2 compliance monitoring
-          
+          Summary:        Drata Agent CLI for Linux
           License:        Apache-2.0
-          URL:            https://drata.com
-          Source0:        drata-agent-linux-amd64
-          Source1:        drata-agent.service
+          URL:            https://github.com/${REPO}
+          Source0:        %{name}-%{version}.tar.gz
           
           BuildArch:      x86_64
-          Requires:       systemd
+          Requires:       nodejs >= 22
           
           %description
-          The Drata Agent CLI is a command-line version of the Drata Agent
-          that monitors your system's security configuration for SOC 2 compliance.
-          It collects read-only information about your system's security settings
-          including screensaver locking, password manager, antivirus software,
-          and automatic updates.
+          The Drata Agent CLI is a lightweight command-line application that reports
+          read-only data about your machine's state for SOC 2 compliance tracking.
+          It collects information about security configurations such as screensaver
+          locking, password managers, antivirus software, and automatic updates.
+          
+          %prep
+          %setup -q
           
           %install
-          mkdir -p %{buildroot}%{_bindir}
-          mkdir -p %{buildroot}%{_unitdir}
-          install -m 755 %{SOURCE0} %{buildroot}%{_bindir}/drata-agent
-          install -m 644 %{SOURCE1} %{buildroot}%{_unitdir}/drata-agent.service
+          mkdir -p %{buildroot}/opt/drata-agent-cli
+          mkdir -p %{buildroot}/usr/bin
+          mkdir -p %{buildroot}/opt/drata-agent-cli/lib/linux/bin
+          
+          install -m 755 cli.js %{buildroot}/opt/drata-agent-cli/
+          install -m 755 osqueryi %{buildroot}/opt/drata-agent-cli/lib/linux/bin/
+          install -m 644 README.md %{buildroot}/opt/drata-agent-cli/
+          install -m 644 LICENSE %{buildroot}/opt/drata-agent-cli/
+          
+          # Create wrapper script
+          cat > %{buildroot}/usr/bin/drata-agent << 'WRAPPER'
+          #!/bin/bash
+          cd /opt/drata-agent-cli
+          exec node /opt/drata-agent-cli/cli.js "\$@"
+          WRAPPER
+          chmod 755 %{buildroot}/usr/bin/drata-agent
           
           %files
-          %{_bindir}/drata-agent
-          %{_unitdir}/drata-agent.service
-          
-          %post
-          %systemd_post drata-agent.service
-          echo "Drata Agent installed successfully."
-          echo "To register: drata-agent register YOUR_TOKEN --region NA"
-          echo "To start daemon: systemctl enable --now drata-agent"
-          
-          %preun
-          %systemd_preun drata-agent.service
-          
-          %postun
-          %systemd_postun_with_restart drata-agent.service
+          /opt/drata-agent-cli
+          /usr/bin/drata-agent
           
           %changelog
-          * $(date "+%a %b %d %Y") Drata Inc <support@drata.com> - 3.9.0-1
+          * $(date "+%a %b %d %Y") Drata Inc <drata@drata.com> - ${VERSION}-1
           - Initial RPM release of Drata Agent CLI
           EOF
 
-      - name: Create systemd service file for RPM
+      - name: Build RPM
         run: |
-          cat > ~/rpmbuild/SOURCES/drata-agent.service << 'EOF'
-          [Unit]
-          Description=Drata Agent
-          After=network.target
-          
-          [Service]
-          Type=simple
-          ExecStart=/usr/bin/drata-agent daemon
-          Restart=always
-          RestartSec=10
-          
-          [Install]
-          WantedBy=multi-user.target
-          EOF
+          rpmbuild -bb ~/rpmbuild/SPECS/drata-agent-cli.spec
 
-      - name: Copy binary to SOURCES
+      - name: Find and rename RPM
+        id: find_rpm
         run: |
-          cp cli/build/drata-agent-linux-amd64 ~/rpmbuild/SOURCES/
+          RPM_FILE=$(find ~/rpmbuild/RPMS -name "*.rpm" | head -1)
+          RPM_NAME=$(basename "$RPM_FILE")
+          cp "$RPM_FILE" ./"$RPM_NAME"
+          echo "rpm_file=$RPM_NAME" >> $GITHUB_OUTPUT
+          echo "rpm_path=./$RPM_NAME" >> $GITHUB_OUTPUT
 
-      - name: Build RPM package
-        run: |
-          rpmbuild -bb ~/rpmbuild/SPECS/drata-agent.spec
-          
-          # List built RPMs
-          ls -la ~/rpmbuild/RPMS/x86_64/
-
-      - name: Copy RPM to workspace
-        run: |
-          cp ~/rpmbuild/RPMS/x86_64/*.rpm .
+      - name: Lint RPM
+        run: rpmlint ${{ steps.find_rpm.outputs.rpm_path }} || true
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: drata-agent-rpm-amd64
-          path: "*.rpm"
-          retention-days: 30
+          name: drata-agent-cli-rpm
+          path: ${{ steps.find_rpm.outputs.rpm_path }}
+
+      - name: Create Release (on tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.find_rpm.outputs.rpm_path }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
