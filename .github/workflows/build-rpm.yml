@@ -40,58 +40,58 @@ jobs:
       - name: Create RPM spec file
         run: |
           CHANGELOG_DATE=$(date "+%a %b %d %Y")
-          cat > ~/rpmbuild/SPECS/drata-agent.spec << 'SPEC_EOF'
-          Name:           drata-agent
-          Version:        3.9.0
-          Release:        1%{?dist}
-          Summary:        Drata Agent CLI for SOC 2 compliance monitoring
+          SPEC_FILE=~/rpmbuild/SPECS/drata-agent.spec
           
-          License:        Apache-2.0
-          URL:            https://drata.com
-          Source0:        drata-agent-linux-amd64
-          Source1:        drata-agent.service
-          Source2:        osqueryi
-          
-          BuildArch:      x86_64
-          Requires:       systemd
-          
-          %description
-          The Drata Agent CLI is a command-line version of the Drata Agent
-          that monitors your system's security configuration for SOC 2 compliance.
-          It collects read-only information about your system's security settings
-          including screensaver locking, password manager, antivirus software,
-          and automatic updates.
-          
-          %install
-          mkdir -p %{buildroot}%{_bindir}
-          mkdir -p %{buildroot}%{_unitdir}
-          mkdir -p %{buildroot}%{_libdir}/drata-agent/bin
-          install -m 755 %{SOURCE0} %{buildroot}%{_bindir}/drata-agent
-          install -m 644 %{SOURCE1} %{buildroot}%{_unitdir}/drata-agent.service
-          install -m 755 %{SOURCE2} %{buildroot}%{_libdir}/drata-agent/bin/osqueryi
-          
-          %files
-          %{_bindir}/drata-agent
-          %{_unitdir}/drata-agent.service
-          %{_libdir}/drata-agent/bin/osqueryi
-          
-          %post
-          %systemd_post drata-agent.service
-          echo "Drata Agent installed successfully."
-          echo "To register: drata-agent register YOUR_TOKEN --region NA"
-          echo "To start daemon: systemctl enable --now drata-agent"
-          
-          %preun
-          %systemd_preun drata-agent.service
-          
-          %postun
-          %systemd_postun_with_restart drata-agent.service
-          
-          %changelog
-          SPEC_EOF
-          # Append changelog with proper date (outside heredoc to allow variable expansion)
-          echo "* ${CHANGELOG_DATE} Drata Inc <support@drata.com> - 3.9.0-1" >> ~/rpmbuild/SPECS/drata-agent.spec
-          echo "- Initial RPM release of Drata Agent CLI" >> ~/rpmbuild/SPECS/drata-agent.spec
+          # Write spec file line by line to avoid heredoc whitespace issues
+          echo "Name:           drata-agent" > $SPEC_FILE
+          echo "Version:        3.9.0" >> $SPEC_FILE
+          echo "Release:        1%{?dist}" >> $SPEC_FILE
+          echo "Summary:        Drata Agent CLI for SOC 2 compliance monitoring" >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "License:        Apache-2.0" >> $SPEC_FILE
+          echo "URL:            https://drata.com" >> $SPEC_FILE
+          echo "Source0:        drata-agent-linux-amd64" >> $SPEC_FILE
+          echo "Source1:        drata-agent.service" >> $SPEC_FILE
+          echo "Source2:        osqueryi" >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "BuildArch:      x86_64" >> $SPEC_FILE
+          echo "Requires:       systemd" >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "%description" >> $SPEC_FILE
+          echo "The Drata Agent CLI is a command-line version of the Drata Agent" >> $SPEC_FILE
+          echo "that monitors your system's security configuration for SOC 2 compliance." >> $SPEC_FILE
+          echo "It collects read-only information about your system's security settings" >> $SPEC_FILE
+          echo "including screensaver locking, password manager, antivirus software," >> $SPEC_FILE
+          echo "and automatic updates." >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "%install" >> $SPEC_FILE
+          echo "mkdir -p %{buildroot}%{_bindir}" >> $SPEC_FILE
+          echo "mkdir -p %{buildroot}%{_unitdir}" >> $SPEC_FILE
+          echo "mkdir -p %{buildroot}%{_libdir}/drata-agent/bin" >> $SPEC_FILE
+          echo "install -m 755 %{SOURCE0} %{buildroot}%{_bindir}/drata-agent" >> $SPEC_FILE
+          echo "install -m 644 %{SOURCE1} %{buildroot}%{_unitdir}/drata-agent.service" >> $SPEC_FILE
+          echo "install -m 755 %{SOURCE2} %{buildroot}%{_libdir}/drata-agent/bin/osqueryi" >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "%files" >> $SPEC_FILE
+          echo "%{_bindir}/drata-agent" >> $SPEC_FILE
+          echo "%{_unitdir}/drata-agent.service" >> $SPEC_FILE
+          echo "%{_libdir}/drata-agent/bin/osqueryi" >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "%post" >> $SPEC_FILE
+          echo "%systemd_post drata-agent.service" >> $SPEC_FILE
+          echo 'echo "Drata Agent installed successfully."' >> $SPEC_FILE
+          echo 'echo "To register: drata-agent register YOUR_TOKEN --region NA"' >> $SPEC_FILE
+          echo 'echo "To start daemon: systemctl enable --now drata-agent"' >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "%preun" >> $SPEC_FILE
+          echo "%systemd_preun drata-agent.service" >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "%postun" >> $SPEC_FILE
+          echo "%systemd_postun_with_restart drata-agent.service" >> $SPEC_FILE
+          echo "" >> $SPEC_FILE
+          echo "%changelog" >> $SPEC_FILE
+          echo "* ${CHANGELOG_DATE} Drata Inc <support@drata.com> - 3.9.0-1" >> $SPEC_FILE
+          echo "- Initial RPM release of Drata Agent CLI" >> $SPEC_FILE
 
       - name: Create systemd service file for RPM
         run: |
