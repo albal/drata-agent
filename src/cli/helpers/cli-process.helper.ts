@@ -40,12 +40,12 @@ export class CliProcessHelper {
         // Validate the osqueryi path before execution
         this.validateOsqueryPath(osqueryiBinaryPath);
 
+        // Use execFile without shell option for security
+        // Pass the binary path directly without quotes
         const result = await this.promiseExecFile(
-            `"${osqueryiBinaryPath}"`,
-            [query],
-            {
-                shell: true,
-            }
+            osqueryiBinaryPath,
+            ['--json', query],
+            {}
         );
 
         return trim(result);

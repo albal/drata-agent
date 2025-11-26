@@ -286,9 +286,10 @@ export class CliSystemQueryService {
             }
 
             if (typeof query.query !== 'undefined') {
+                // Pass the query directly - execFile handles quoting safely
                 const raw = await CliProcessHelper.runQuery(
                     this.osqueryiBinaryPath,
-                    `--json "${query.query}"`
+                    query.query
                 );
                 result = JSON.parse(raw);
             } else if (typeof query.command !== 'undefined') {
