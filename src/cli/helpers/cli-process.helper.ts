@@ -1,4 +1,6 @@
 import { exec, execFile, ExecFileOptions } from 'child_process';
+import { existsSync } from 'fs';
+import path from 'path';
 import { isEmpty, trim } from 'lodash';
 import { CliLogger } from './cli-logger.helper';
 
@@ -8,7 +10,36 @@ import { CliLogger } from './cli-logger.helper';
 export class CliProcessHelper {
     private static readonly logger = new CliLogger('CliProcessHelper');
 
+    /**
+     * Validates that the osqueryi binary path is safe to execute
+     * @param osqueryiBinaryPath Path to the osqueryi binary
+     * @throws Error if the path is invalid or unsafe
+     */
+    private static validateOsqueryPath(osqueryiBinaryPath: string): void {
+        // Normalize the path to resolve any .. or . components
+        const normalizedPath = path.normalize(osqueryiBinaryPath);
+
+        // Ensure the path ends with 'osqueryi' (case-sensitive on Linux)
+        const basename = path.basename(normalizedPath);
+        if (basename !== 'osqueryi') {
+            throw new Error('Invalid osqueryi binary path: must end with "osqueryi"');
+        }
+
+        // Check for dangerous characters that could enable command injection
+        if (/[;&|`$(){}[\]<>!]/.test(normalizedPath)) {
+            throw new Error('Invalid osqueryi binary path: contains unsafe characters');
+        }
+
+        // Check that the file exists
+        if (!existsSync(normalizedPath)) {
+            throw new Error(`osqueryi binary not found at: ${normalizedPath}`);
+        }
+    }
+
     static async runQuery(osqueryiBinaryPath: string, query: string): Promise<string> {
+        // Validate the osqueryi path before execution
+        this.validateOsqueryPath(osqueryiBinaryPath);
+
         const result = await this.promiseExecFile(
             `"${osqueryiBinaryPath}"`,
             [query],

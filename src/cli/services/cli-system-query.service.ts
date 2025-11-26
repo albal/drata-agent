@@ -88,25 +88,25 @@ export class CliSystemQueryService {
             platform: 'LINUX',
             rawQueryResults: {
                 osVersion: await this.runQuery({
-                    description: "What Operating System is running and what is it's version?",
+                    description: "What Operating System is running and what is its version?",
                     query: 'SELECT name, version, platform FROM os_version',
                     transform: (res: any[]) => res[0],
                 }),
 
                 hwSerial: await this.runQuery({
-                    description: "What's the workstations serial number?",
+                    description: "What is the workstation's serial number?",
                     query: 'SELECT hardware_serial FROM system_info',
                     transform: (res: any[]) => res[0],
                 }),
 
                 hwModel: await this.runQuery({
-                    description: "What's the workstations model?",
+                    description: "What is the workstation's model?",
                     query: 'SELECT hardware_model FROM system_info',
                     transform: (res: any[]) => res[0],
                 }),
 
                 ...(await this.runQuery({
-                    description: "What's the system information?",
+                    description: "What is the system information?",
                     query: 'SELECT board_serial, board_model, computer_name, hostname, local_hostname FROM system_info',
                     transform: (res: any[]) => ({
                         boardSerial: res[0]?.board_serial,
@@ -225,7 +225,7 @@ export class CliSystemQueryService {
     async getAgentDeviceIdentifiers(): Promise<AgentDeviceIdentifiers> {
         return {
             hwSerial: await this.runQuery({
-                description: "What's the workstations serial number?",
+                description: "What is the workstation's serial number?",
                 query: 'SELECT hardware_serial, board_serial FROM system_info',
                 transform: (res: any[]) => res[0],
             }),
@@ -295,7 +295,7 @@ export class CliSystemQueryService {
                 result = await CliProcessHelper.runCommand(query.command);
             } else {
                 throw new Error(
-                    `The query "${query.description}" doesn't include neither a query nor a command.`
+                    `The query "${query.description}" doesn't include either a query or a command.`
                 );
             }
 

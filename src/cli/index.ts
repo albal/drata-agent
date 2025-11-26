@@ -12,7 +12,9 @@ import { CliLogger } from './helpers/cli-logger.helper';
 import { CliApiService } from './services/cli-api.service';
 import { CliSystemQueryService } from './services/cli-system-query.service';
 
-const VERSION = '3.9.0';
+// Version is injected by webpack at build time from package.json
+declare const __CLI_VERSION__: string;
+const VERSION = typeof __CLI_VERSION__ !== 'undefined' ? __CLI_VERSION__ : '0.0.0';
 const logger = new CliLogger('DrataAgentCLI');
 
 /**

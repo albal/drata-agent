@@ -58,7 +58,7 @@ export class CliAxiosHelper {
 
                 return config;
             },
-            error => Promise.reject(new Error(error))
+            error => Promise.reject(error)
         );
     }
 

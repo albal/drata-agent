@@ -1,6 +1,7 @@
 const path = require('path');
 const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
+const packageJson = require('./package.json');
 
 module.exports = env => {
     // Allow external node_modules path for building without full deps
@@ -54,6 +55,7 @@ module.exports = env => {
                 'process.env.TARGET_ENV': JSON.stringify(
                     env.targetEnv || 'PROD',
                 ),
+                '__CLI_VERSION__': JSON.stringify(packageJson.version),
             }),
             new webpack.BannerPlugin({
                 banner: '#!/usr/bin/env node',
