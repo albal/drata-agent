@@ -48,6 +48,7 @@ jobs:
           mkdir -p flatpak-build
           
           # Create manifest for CLI-only application (no desktop/UI components)
+          # Install osqueryi to /app/bin so it's in PATH for Flatpak sandboxed environment
           cat > flatpak-build/com.drata.Agent.yml << 'EOF'
           app-id: com.drata.Agent
           runtime: org.freedesktop.Platform
@@ -62,7 +63,7 @@ jobs:
               buildsystem: simple
               build-commands:
                 - install -Dm755 drata-agent-linux-amd64 /app/bin/drata-agent
-                - install -Dm755 osqueryi /app/lib/drata-agent/bin/osqueryi
+                - install -Dm755 osqueryi /app/bin/osqueryi
               sources:
                 - type: file
                   path: drata-agent-linux-amd64

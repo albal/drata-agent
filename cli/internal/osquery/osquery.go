@@ -4,7 +4,9 @@ package osquery
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -85,28 +87,59 @@ func findOsqueryBinary() (string, error) {
 		binaryName = "osqueryi.exe"
 	}
 
-	// Check common locations
+	// Build list of paths to search
+	var searchPaths []string
+
+	// Add user home directory paths (important for Flatpak/immutable OS)
+	if home := os.Getenv("HOME"); home != "" {
+		searchPaths = append(searchPaths,
+			filepath.Join(home, ".local", "bin", "osqueryi"),
+			filepath.Join(home, ".local", "lib", "drata-agent", "bin", "osqueryi"),
+		)
+	}
+
+	// Flatpak-specific paths
+	searchPaths = append(searchPaths,
+		"/app/bin/osqueryi",
+		"/app/lib/drata-agent/bin/osqueryi",
+	)
+
+	// Common system locations
 	commonPaths := []string{
 		"/usr/local/bin/osqueryi",
 		"/usr/bin/osqueryi",
 		"/opt/osquery/bin/osqueryi",
+		"/usr/lib/drata-agent/bin/osqueryi",
+		"/usr/lib64/drata-agent/bin/osqueryi",
 		"C:\\Program Files\\osquery\\osqueryi.exe",
 		"C:\\ProgramData\\osquery\\osqueryi.exe",
 	}
+	searchPaths = append(searchPaths, commonPaths...)
 
 	// First, try PATH
 	if path, err := exec.LookPath(binaryName); err == nil {
 		return path, nil
 	}
 
-	// Then check common locations
-	for _, path := range commonPaths {
-		if _, err := exec.LookPath(path); err == nil {
+	// Then check all configured paths
+	for _, path := range searchPaths {
+		if fileExists(path) {
 			return path, nil
 		}
 	}
 
-	return "", fmt.Errorf("osqueryi not found in PATH or common locations")
+	// Build error message with all searched paths
+	return "", fmt.Errorf("%s not found in PATH or common locations. Searched paths:\n  - PATH lookup for '%s'\n  - %s",
+		binaryName, binaryName, strings.Join(searchPaths, "\n  - "))
+}
+
+// fileExists checks if a file exists and is not a directory.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
 
 // GetPlatform returns the detected platform.
