@@ -47,6 +47,7 @@ jobs:
         run: |
           mkdir -p flatpak-build
           
+          # Create manifest for CLI-only application (no desktop/UI components)
           cat > flatpak-build/com.drata.Agent.yml << 'EOF'
           app-id: com.drata.Agent
           runtime: org.freedesktop.Platform
@@ -56,7 +57,6 @@ jobs:
           finish-args:
             - --share=network
             - --filesystem=home
-            - --talk-name=org.freedesktop.secrets
           modules:
             - name: drata-agent
               buildsystem: simple
@@ -70,84 +70,6 @@ jobs:
       - name: Copy binary to flatpak build directory
         run: |
           cp cli/build/drata-agent-linux-amd64 flatpak-build/
-
-      - name: Create desktop entry
-        run: |
-          mkdir -p flatpak-build/share/applications
-          cat > flatpak-build/share/applications/com.drata.Agent.desktop << 'EOF'
-          [Desktop Entry]
-          Name=Drata Agent
-          Comment=SOC 2 compliance monitoring agent
-          Exec=drata-agent
-          Icon=com.drata.Agent
-          Terminal=true
-          Type=Application
-          Categories=Utility;
-          EOF
-
-      - name: Create AppStream metadata
-        run: |
-          mkdir -p flatpak-build/share/metainfo
-          cat > flatpak-build/share/metainfo/com.drata.Agent.metainfo.xml << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <component type="console-application">
-            <id>com.drata.Agent</id>
-            <name>Drata Agent</name>
-            <summary>SOC 2 compliance monitoring agent</summary>
-            <metadata_license>CC0-1.0</metadata_license>
-            <project_license>Apache-2.0</project_license>
-            <description>
-              <p>
-                The Drata Agent CLI is a command-line version of the Drata Agent
-                that monitors your system's security configuration for SOC 2 compliance.
-              </p>
-              <p>
-                It collects read-only information about your system's security settings
-                including screensaver locking, password manager, antivirus software,
-                and automatic updates.
-              </p>
-            </description>
-            <url type="homepage">https://drata.com</url>
-            <url type="help">https://help.drata.com</url>
-            <provides>
-              <binary>drata-agent</binary>
-            </provides>
-            <releases>
-              <release version="3.9.0" date="2025-01-01">
-                <description>
-                  <p>Initial CLI release</p>
-                </description>
-              </release>
-            </releases>
-            <content_rating type="oars-1.1" />
-          </component>
-          EOF
-
-      - name: Update manifest with additional files
-        run: |
-          cat > flatpak-build/com.drata.Agent.yml << 'EOF'
-          app-id: com.drata.Agent
-          runtime: org.freedesktop.Platform
-          runtime-version: '23.08'
-          sdk: org.freedesktop.Sdk
-          command: drata-agent
-          finish-args:
-            - --share=network
-            - --filesystem=home
-            - --talk-name=org.freedesktop.secrets
-          modules:
-            - name: drata-agent
-              buildsystem: simple
-              build-commands:
-                - install -Dm755 drata-agent-linux-amd64 /app/bin/drata-agent
-                - install -Dm644 share/applications/com.drata.Agent.desktop /app/share/applications/com.drata.Agent.desktop
-                - install -Dm644 share/metainfo/com.drata.Agent.metainfo.xml /app/share/metainfo/com.drata.Agent.metainfo.xml
-              sources:
-                - type: file
-                  path: drata-agent-linux-amd64
-                - type: dir
-                  path: share
-          EOF
 
       - name: Build Flatpak
         working-directory: flatpak-build
