@@ -284,7 +284,6 @@ yargs(hideBin(process.argv))
         'Manually run a sync operation',
         (yargs) => {
             return yargs.option('verbose', {
-                alias: 'v',
                 type: 'boolean',
                 description: 'Show verbose output',
             });

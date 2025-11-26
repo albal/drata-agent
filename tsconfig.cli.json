@@ -1,0 +1,26 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "target": "es2019",
+        "module": "commonjs",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "baseUrl": "./src/",
+        "resolveJsonModule": true
+    },
+    "include": [
+        "src/cli/**/*",
+        "src/enums/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "src/renderer/**/*",
+        "src/main/**/*",
+        "src/bridge/**/*",
+        "src/**/*.spec.ts",
+        "src/**/*.test.ts"
+    ]
+}

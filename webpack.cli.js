@@ -3,6 +3,9 @@ const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = env => {
+    // Allow external node_modules path for building without full deps
+    const nodeModulesPath = process.env.CLI_NODE_MODULES || path.join(__dirname, 'node_modules');
+
     return {
         target: 'node',
         entry: {
@@ -14,13 +17,25 @@ module.exports = env => {
         },
         resolve: {
             extensions: ['.tsx', '.ts', '.js'],
+            modules: [nodeModulesPath, 'node_modules'],
+        },
+        resolveLoader: {
+            modules: [nodeModulesPath, 'node_modules'],
         },
         module: {
             rules: [
                 {
                     test: /\.ts$/,
-                    include: /src/,
-                    use: [{ loader: 'ts-loader' }],
+                    include: [
+                        path.join(__dirname, 'src', 'cli'),
+                        path.join(__dirname, 'src', 'enums'),
+                    ],
+                    use: [{
+                        loader: 'ts-loader',
+                        options: {
+                            configFile: 'tsconfig.cli.json',
+                        },
+                    }],
                 },
             ],
         },

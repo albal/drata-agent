@@ -66,18 +66,14 @@ export class CliSystemQueryService {
         this.appVersion = appVersion;
 
         // Determine osqueryi binary path
-        // When packaged, it will be in a specific location
-        // For development, use the lib directory
-        const isPackaged = process.env.CLI_PACKAGED === 'true';
-        if (isPackaged && process.env.CLI_OSQUERYI_PATH) {
+        // Priority: CLI_OSQUERYI_PATH env var > packaged location > development location
+        if (process.env.CLI_OSQUERYI_PATH) {
             this.osqueryiBinaryPath = process.env.CLI_OSQUERYI_PATH;
         } else {
-            // Use the lib directory path relative to the CLI
+            // Use the lib directory path relative to the current working directory
+            // This works both in development and when installed
             this.osqueryiBinaryPath = path.join(
-                __dirname,
-                '..',
-                '..',
-                '..',
+                process.cwd(),
                 'lib',
                 'linux',
                 'bin',
