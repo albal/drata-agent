@@ -28,7 +28,10 @@ jobs:
         run: go install github.com/google/osv-scanner/cmd/osv-scanner@latest
 
       - name: Run OSV scan
+        # OSV-Scanner returns exit code 1 when vulnerabilities are found; allow the
+        # workflow to continue so we can still upload the SARIF results.
         run: ~/go/bin/osv-scanner --lockfile=yarn.lock --format sarif --output osv.sarif
+        continue-on-error: true
 
       - name: Upload OSV SARIF
         uses: github/codeql-action/upload-sarif@v3
