@@ -80,18 +80,10 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 		}
 	}
 
-	// Antivirus Check - check for clamtk (ClamAV GUI) and clamav
+	// Antivirus Check - check for clamav and flatpak-installed clam apps
 	antivirusStatus := map[string]interface{}{"passed": false}
 	if c.isRPMBasedDistro() {
-		// Check if clamtk is installed via RPM
-		if output, err := c.RunCommand("rpm -q clamtk"); err == nil && output != "" {
-			antivirusStatus["clamtk"] = map[string]interface{}{
-				"installed": true,
-				"version":   output,
-			}
-			antivirusStatus["passed"] = true
-		}
-		// Also check for clamav daemon
+		// Check for clamav daemon
 		if output, err := c.RunCommand("rpm -q clamav"); err == nil && output != "" {
 			antivirusStatus["clamav"] = map[string]interface{}{
 				"installed": true,
@@ -100,15 +92,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			antivirusStatus["passed"] = true
 		}
 	} else {
-		// Check for clamtk on Debian/Ubuntu
-		if output, err := c.RunCommand("dpkg -l clamtk | grep -E '^ii'"); err == nil && output != "" {
-			antivirusStatus["clamtk"] = map[string]interface{}{
-				"installed": true,
-				"version":   output,
-			}
-			antivirusStatus["passed"] = true
-		}
-		// Also check for clamav
+		// Check for clamav on Debian/Ubuntu
 		if output, err := c.RunCommand("dpkg -l clamav | grep -E '^ii'"); err == nil && output != "" {
 			antivirusStatus["clamav"] = map[string]interface{}{
 				"installed": true,
@@ -160,19 +144,19 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 		rawResults["macAddress"] = result
 	}
 
-	// Auto Update Settings - distro-specific
+	// Auto Update Settings - use only gsettings for autoUpdateEnabled check
 	autoUpdateSettings := make([]interface{}, 0)
+	// GNOME Software automatic updates check - only this sets autoUpdateEnabled
+	if output, err := c.RunCommand("gsettings get org.gnome.software download-updates"); err == nil {
+		autoUpdateSettings = append(autoUpdateSettings, map[string]string{"gnomeSoftwareDownloadUpdates": output})
+		if output == "true" {
+			rawResults["autoUpdateEnabled"] = map[string]interface{}{"passed": 1}
+		}
+	}
+	// Collect additional distro-specific update settings for informational purposes
 	if c.isRPMBasedDistro() {
-		// DNF/YUM automatic updates for RHEL/Fedora - only collect for settings, not autoUpdateEnabled
 		if output, err := c.RunCommand("systemctl is-enabled dnf-automatic.timer || systemctl is-enabled yum-cron"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"autoUpdateService": output})
-		}
-		// GNOME Software automatic updates check for Fedora/RHEL - only this sets autoUpdateEnabled
-		if output, err := c.RunCommand("gsettings get org.gnome.software download-updates"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"gnomeSoftwareDownloadUpdates": output})
-			if output == "true" {
-				rawResults["autoUpdateEnabled"] = map[string]interface{}{"passed": 1}
-			}
 		}
 		if output, err := c.RunCommand("dnf history list --last 10 || yum history list last 10"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"recentUpdates": output})
@@ -184,10 +168,6 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"recentPackages": output})
 		}
 	} else {
-		// APT automatic updates for Debian/Ubuntu - keep existing behavior for non-RPM distros
-		if result, err := c.queryFirst("SELECT COUNT(*) AS passed FROM file WHERE path = '/etc/apt/apt.conf.d/50unattended-upgrades'"); err == nil && result != nil {
-			rawResults["autoUpdateEnabled"] = result
-		}
 		if output, err := c.RunCommand("apt-config dump | grep -E '^(APT::Periodic|Unattended-Upgrade)::'"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"aptConfig": output})
 		}
