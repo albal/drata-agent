@@ -140,14 +140,9 @@ export class UbuntuSystemQueryService
 
                 screenLockStatus: await this.runQueries([
                     {
-                        description: 'Time for screen to lock',
+                        description: 'Idle delay for screen lock',
                         command:
-                            'gsettings get org.gnome.desktop.screensaver lock-delay',
-                    },
-                    {
-                        description: 'Is screenlock enabled?',
-                        command:
-                            'gsettings get org.gnome.desktop.screensaver lock-enabled',
+                            'gsettings get org.gnome.desktop.session idle-delay',
                     },
                 ]),
 

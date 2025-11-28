@@ -80,6 +80,53 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 		}
 	}
 
+	// Antivirus Check - check for clamtk (ClamAV GUI) and clamav
+	antivirusStatus := map[string]interface{}{"passed": false}
+	if c.isRPMBasedDistro() {
+		// Check if clamtk is installed via RPM
+		if output, err := c.RunCommand("rpm -q clamtk"); err == nil && output != "" {
+			antivirusStatus["clamtk"] = map[string]interface{}{
+				"installed": true,
+				"version":   output,
+			}
+			antivirusStatus["passed"] = true
+		}
+		// Also check for clamav daemon
+		if output, err := c.RunCommand("rpm -q clamav"); err == nil && output != "" {
+			antivirusStatus["clamav"] = map[string]interface{}{
+				"installed": true,
+				"version":   output,
+			}
+			antivirusStatus["passed"] = true
+		}
+	} else {
+		// Check for clamtk on Debian/Ubuntu
+		if output, err := c.RunCommand("dpkg -l clamtk | grep -E '^ii'"); err == nil && output != "" {
+			antivirusStatus["clamtk"] = map[string]interface{}{
+				"installed": true,
+				"version":   output,
+			}
+			antivirusStatus["passed"] = true
+		}
+		// Also check for clamav
+		if output, err := c.RunCommand("dpkg -l clamav | grep -E '^ii'"); err == nil && output != "" {
+			antivirusStatus["clamav"] = map[string]interface{}{
+				"installed": true,
+				"version":   output,
+			}
+			antivirusStatus["passed"] = true
+		}
+	}
+	// Check for clamtk/clamav installed via Flatpak
+	if output, err := c.RunCommand("flatpak list --app | grep -i clam"); err == nil && output != "" {
+		antivirusStatus["flatpak"] = map[string]interface{}{
+			"installed": true,
+			"version":   output,
+		}
+		antivirusStatus["passed"] = true
+	}
+	rawResults["antivirusStatus"] = antivirusStatus
+
 	// Browser Extensions - use user home directory paths
 	homeDir := os.Getenv("HOME")
 	if homeDir == "" {
@@ -116,73 +163,67 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 	// Auto Update Settings - distro-specific
 	autoUpdateSettings := make([]interface{}, 0)
 	if c.isRPMBasedDistro() {
-		// DNF/YUM automatic updates for RHEL/Fedora
-		if output, err := c.RunCommand("systemctl is-enabled dnf-automatic.timer 2>/dev/null || systemctl is-enabled yum-cron 2>/dev/null"); err == nil {
+		// DNF/YUM automatic updates for RHEL/Fedora - only collect for settings, not autoUpdateEnabled
+		if output, err := c.RunCommand("systemctl is-enabled dnf-automatic.timer || systemctl is-enabled yum-cron"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"autoUpdateService": output})
-			if output == "enabled" {
+		}
+		// GNOME Software automatic updates check for Fedora/RHEL - only this sets autoUpdateEnabled
+		if output, err := c.RunCommand("gsettings get org.gnome.software download-updates"); err == nil {
+			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"gnomeSoftwareDownloadUpdates": output})
+			if output == "true" {
 				rawResults["autoUpdateEnabled"] = map[string]interface{}{"passed": 1}
 			}
 		}
-		if output, err := c.RunCommand("dnf history list --last 10 2>/dev/null || yum history list last 10 2>/dev/null"); err == nil {
+		if output, err := c.RunCommand("dnf history list --last 10 || yum history list last 10"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"recentUpdates": output})
 		}
-		if output, err := c.RunCommand("cat /etc/dnf/automatic.conf 2>/dev/null || cat /etc/yum/yum-cron.conf 2>/dev/null"); err == nil {
+		if output, err := c.RunCommand("cat /etc/dnf/automatic.conf || cat /etc/yum/yum-cron.conf"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"autoUpdateConfig": output})
 		}
 		if output, err := c.RunCommand("rpm -q --last | head -20"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"recentPackages": output})
 		}
 	} else {
-		// APT automatic updates for Debian/Ubuntu
+		// APT automatic updates for Debian/Ubuntu - keep existing behavior for non-RPM distros
 		if result, err := c.queryFirst("SELECT COUNT(*) AS passed FROM file WHERE path = '/etc/apt/apt.conf.d/50unattended-upgrades'"); err == nil && result != nil {
 			rawResults["autoUpdateEnabled"] = result
 		}
-		if output, err := c.RunCommand("apt-config dump 2>/dev/null | grep -E '^(APT::Periodic|Unattended-Upgrade)::'"); err == nil {
+		if output, err := c.RunCommand("apt-config dump | grep -E '^(APT::Periodic|Unattended-Upgrade)::'"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"aptConfig": output})
 		}
-		if output, err := c.RunCommand("systemctl show apt-daily* --property=NextElapseUSecMonotonic,NextElapseUSecRealtime,Unit,Description,UnitFileState,LastTriggerUSec 2>/dev/null"); err == nil {
+		if output, err := c.RunCommand("systemctl show apt-daily* --property=NextElapseUSecMonotonic,NextElapseUSecRealtime,Unit,Description,UnitFileState,LastTriggerUSec"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"aptDailyStatus": output})
 		}
-		if output, err := c.RunCommand("journalctl --user -u apt-daily.service -u apt-daily-upgrade.service --since -7day -n 10 --no-pager --quiet 2>/dev/null || journalctl -u apt-daily.service -u apt-daily-upgrade.service --since -7day -n 10 --no-pager --quiet 2>/dev/null"); err == nil {
+		if output, err := c.RunCommand("journalctl --user -u apt-daily.service -u apt-daily-upgrade.service --since -7day -n 10 --no-pager --quiet || journalctl -u apt-daily.service -u apt-daily-upgrade.service --since -7day -n 10 --no-pager --quiet"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"aptDailyLogs": output})
 		}
 	}
 	rawResults["autoUpdateSettings"] = autoUpdateSettings
 
-	// Screen Lock Status - works for any user with GNOME
+	// Screen Lock Status - only check idle-delay for Fedora/RHEL Gnome
 	screenLockStatus := make([]interface{}, 0)
-	// Use DBUS_SESSION_BUS_ADDRESS from environment if available
-	if output, err := c.RunCommand("gsettings get org.gnome.desktop.screensaver lock-delay 2>/dev/null"); err == nil {
-		screenLockStatus = append(screenLockStatus, map[string]string{"lockDelay": output})
-	}
-	if output, err := c.RunCommand("gsettings get org.gnome.desktop.screensaver lock-enabled 2>/dev/null"); err == nil {
-		screenLockStatus = append(screenLockStatus, map[string]string{"lockEnabled": output})
-	}
-	// Also check KDE Plasma settings for Fedora KDE spin
-	if output, err := c.RunCommand("kreadconfig5 --file kscreenlockerrc --group Daemon --key Autolock 2>/dev/null"); err == nil && output != "" {
-		screenLockStatus = append(screenLockStatus, map[string]string{"kdeAutolock": output})
-	}
-	if output, err := c.RunCommand("kreadconfig5 --file kscreenlockerrc --group Daemon --key Timeout 2>/dev/null"); err == nil && output != "" {
-		screenLockStatus = append(screenLockStatus, map[string]string{"kdeTimeout": output})
+	// Check idle-delay from org.gnome.desktop.session for Fedora/RHEL Gnome - this is the only check
+	if output, err := c.RunCommand("gsettings get org.gnome.desktop.session idle-delay"); err == nil {
+		screenLockStatus = append(screenLockStatus, map[string]string{"idleDelay": output})
 	}
 	rawResults["screenLockStatus"] = screenLockStatus
 
 	// Location Services
 	locationServices := make(map[string]interface{})
-	if output, err := c.RunCommand("gsettings get org.gnome.system.location enabled 2>/dev/null"); err == nil {
+	if output, err := c.RunCommand("gsettings get org.gnome.system.location enabled"); err == nil {
 		locationServices["gnomeLocation"] = output
 	}
 	rawResults["locationServices"] = locationServices
 
 	// Screen Lock Settings - use gsettings which works for current user
 	screenLockSettings := make(map[string]interface{})
-	if output, err := c.RunCommand("gsettings list-recursively org.gnome.settings-daemon.plugins.power 2>/dev/null"); err == nil && output != "" {
+	if output, err := c.RunCommand("gsettings list-recursively org.gnome.settings-daemon.plugins.power"); err == nil && output != "" {
 		screenLockSettings["powerSettings"] = output
 	}
-	if output, err := c.RunCommand("gsettings list-recursively org.gnome.desktop.screensaver 2>/dev/null"); err == nil && output != "" {
+	if output, err := c.RunCommand("gsettings list-recursively org.gnome.desktop.screensaver"); err == nil && output != "" {
 		screenLockSettings["screenSettings"] = output
 	}
-	if output, err := c.RunCommand("gsettings list-recursively org.gnome.desktop.session 2>/dev/null"); err == nil && output != "" {
+	if output, err := c.RunCommand("gsettings list-recursively org.gnome.desktop.session"); err == nil && output != "" {
 		screenLockSettings["sessionSettings"] = output
 	}
 	rawResults["screenLockSettings"] = screenLockSettings
