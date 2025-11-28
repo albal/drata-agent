@@ -39,4 +39,6 @@ sample.env
 # Build
 drata.pfx
 /scripts
-/cli
+
+# CLI build artifacts
+/cli/build/
