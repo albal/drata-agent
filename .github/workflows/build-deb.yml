@@ -37,7 +37,7 @@ jobs:
 
       - name: Create DEB package structure
         run: |
-          VERSION="3.9.0"
+          VERSION="3.9.9"
           PKG_NAME="drata-agent"
           PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
           
@@ -116,7 +116,7 @@ jobs:
 
       - name: Build DEB package
         run: |
-          VERSION="3.9.0"
+          VERSION="3.9.9"
           PKG_NAME="drata-agent"
           PKG_DIR="${PKG_NAME}_${VERSION}_amd64"
           

@@ -56,7 +56,7 @@ func DefaultConfig() *Config {
 		MinHoursSinceLastSync:  24,
 		MinMinutesBetweenSyncs: 15,
 		OsqueryPath:            "",
-		Version:                "3.9.0-cli",
+		Version:                "3.9.9-cli",
 	}
 }
 

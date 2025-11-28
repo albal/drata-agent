@@ -34,7 +34,7 @@ jobs:
         run: |
           go mod download
           go mod tidy
-          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=3.9.0-cli" -o build/drata-agent-linux-amd64 .
+          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=3.9.9-cli" -o build/drata-agent-linux-amd64 .
           chmod +x build/drata-agent-linux-amd64
 
       - name: Create RPM spec file
@@ -44,7 +44,7 @@ jobs:
           
           # Write spec file line by line to avoid heredoc whitespace issues
           echo "Name:           drata-agent" > $SPEC_FILE
-          echo "Version:        3.9.0" >> $SPEC_FILE
+          echo "Version:        3.9.9" >> $SPEC_FILE
           echo "Release:        1%{?dist}" >> $SPEC_FILE
           echo "Summary:        Drata Agent CLI for SOC 2 compliance monitoring" >> $SPEC_FILE
           echo "" >> $SPEC_FILE
@@ -90,7 +90,7 @@ jobs:
           echo "%systemd_postun_with_restart drata-agent.service" >> $SPEC_FILE
           echo "" >> $SPEC_FILE
           echo "%changelog" >> $SPEC_FILE
-          echo "* ${CHANGELOG_DATE} Drata Inc <support@drata.com> - 3.9.0-1" >> $SPEC_FILE
+          echo "* ${CHANGELOG_DATE} Drata Inc <support@drata.com> - 3.9.9-1" >> $SPEC_FILE
           echo "- Initial RPM release of Drata Agent CLI" >> $SPEC_FILE
 
       - name: Create systemd service file for RPM

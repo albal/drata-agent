@@ -1,7 +1,7 @@
 # Makefile for Drata Agent CLI
 
 # Version
-VERSION := 3.9.0-cli
+VERSION := 3.9.9-cli
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
 # Binary name

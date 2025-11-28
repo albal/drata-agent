@@ -43,10 +43,16 @@ type AgentDeviceIdentifiers struct {
 type Client struct {
 	binaryPath string
 	platform   Platform
+	verbose    bool
 }
 
 // NewClient creates a new osquery client.
 func NewClient(binaryPath string) (*Client, error) {
+	return NewClientWithVerbose(binaryPath, false)
+}
+
+// NewClientWithVerbose creates a new osquery client with verbose option.
+func NewClientWithVerbose(binaryPath string, verbose bool) (*Client, error) {
 	platform, err := detectPlatform()
 	if err != nil {
 		return nil, err
@@ -63,7 +69,25 @@ func NewClient(binaryPath string) (*Client, error) {
 	return &Client{
 		binaryPath: binaryPath,
 		platform:   platform,
+		verbose:    verbose,
 	}, nil
+}
+
+// SetVerbose sets the verbose mode for the client.
+func (c *Client) SetVerbose(verbose bool) {
+	c.verbose = verbose
+}
+
+// IsVerbose returns whether verbose mode is enabled.
+func (c *Client) IsVerbose() bool {
+	return c.verbose
+}
+
+// logVerbose prints a message if verbose mode is enabled.
+func (c *Client) logVerbose(format string, args ...interface{}) {
+	if c.verbose {
+		fmt.Printf("[VERBOSE] "+format+"\n", args...)
+	}
 }
 
 // detectPlatform detects the current platform.
@@ -149,20 +173,25 @@ func (c *Client) GetPlatform() Platform {
 
 // RunQuery executes an osquery SQL query and returns the JSON result.
 func (c *Client) RunQuery(query string) ([]map[string]interface{}, error) {
+	c.logVerbose("Executing osquery: %s", query)
 	cmd := exec.Command(c.binaryPath, "--json", query)
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
+			c.logVerbose("Query failed: %s", string(exitErr.Stderr))
 			return nil, fmt.Errorf("osquery error: %s", string(exitErr.Stderr))
 		}
+		c.logVerbose("Query failed: %v", err)
 		return nil, err
 	}
 
 	var result []map[string]interface{}
 	if err := json.Unmarshal(output, &result); err != nil {
+		c.logVerbose("Failed to parse output: %v", err)
 		return nil, fmt.Errorf("failed to parse osquery output: %w", err)
 	}
 
+	c.logVerbose("Query returned %d results", len(result))
 	return result, nil
 }
 
@@ -171,6 +200,7 @@ func (c *Client) RunQuery(query string) ([]map[string]interface{}, error) {
 // from the platform-specific system query implementations (macos.go, linux.go, windows.go).
 // Commands are hardcoded system utilities and should never include user input.
 func (c *Client) RunCommand(command string) (string, error) {
+	c.logVerbose("Executing command: %s", command)
 	var cmd *exec.Cmd
 
 	switch c.platform {
@@ -185,12 +215,16 @@ func (c *Client) RunCommand(command string) (string, error) {
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
+			c.logVerbose("Command failed: %s", string(exitErr.Stderr))
 			return "", fmt.Errorf("command error: %s", string(exitErr.Stderr))
 		}
+		c.logVerbose("Command failed: %v", err)
 		return "", err
 	}
 
-	return strings.TrimSpace(string(output)), nil
+	result := strings.TrimSpace(string(output))
+	c.logVerbose("Command output length: %d chars", len(result))
+	return result, nil
 }
 
 // GetSystemInfo collects comprehensive system information.

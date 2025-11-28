@@ -35,10 +35,12 @@ Example:
 }
 
 var forceSync bool
+var verboseSync bool
 
 func init() {
 	rootCmd.AddCommand(syncCmd)
 	syncCmd.Flags().BoolVarP(&forceSync, "force", "f", false, "Force sync even if recently synced")
+	syncCmd.Flags().BoolVarP(&verboseSync, "verbose", "v", false, "Show verbose output including queries being executed")
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
@@ -79,10 +81,16 @@ func runSync(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Initialize osquery client
-	osq, err := osquery.NewClient(cfg.OsqueryPath)
+	// Initialize osquery client with verbose option
+	osq, err := osquery.NewClientWithVerbose(cfg.OsqueryPath, verboseSync)
 	if err != nil {
 		return fmt.Errorf("failed to initialize osquery: %w", err)
+	}
+
+	if verboseSync {
+		fmt.Printf("Verbose mode enabled\n")
+		fmt.Printf("Platform: %s\n", osq.GetPlatform())
+		fmt.Printf("Agent version: %s\n", cfg.Version)
 	}
 
 	// Initialize API client

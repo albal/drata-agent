@@ -25,7 +25,7 @@ including screensaver locking, password manager, antivirus software, and
 automatic updates.
 
 For more information, visit https://help.drata.com/`,
-		Version: "3.9.0-cli",
+		Version: "3.9.9-cli",
 	}
 )
 
