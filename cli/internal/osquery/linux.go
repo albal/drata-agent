@@ -80,7 +80,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 		}
 	}
 
-	// Antivirus Check - check for clamtk (ClamAV GUI) on Fedora/RHEL
+	// Antivirus Check - check for clamtk (ClamAV GUI) and clamav
 	antivirusStatus := map[string]interface{}{"passed": false}
 	if c.isRPMBasedDistro() {
 		// Check if clamtk is installed via RPM
@@ -116,6 +116,14 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			}
 			antivirusStatus["passed"] = true
 		}
+	}
+	// Check for clamtk/clamav installed via Flatpak
+	if output, err := c.RunCommand("flatpak list --app | grep -i clam"); err == nil && output != "" {
+		antivirusStatus["flatpak"] = map[string]interface{}{
+			"installed": true,
+			"version":   output,
+		}
+		antivirusStatus["passed"] = true
 	}
 	rawResults["antivirusStatus"] = antivirusStatus
 
@@ -155,14 +163,11 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 	// Auto Update Settings - distro-specific
 	autoUpdateSettings := make([]interface{}, 0)
 	if c.isRPMBasedDistro() {
-		// DNF/YUM automatic updates for RHEL/Fedora
+		// DNF/YUM automatic updates for RHEL/Fedora - only collect for settings, not autoUpdateEnabled
 		if output, err := c.RunCommand("systemctl is-enabled dnf-automatic.timer || systemctl is-enabled yum-cron"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"autoUpdateService": output})
-			if output == "enabled" {
-				rawResults["autoUpdateEnabled"] = map[string]interface{}{"passed": 1}
-			}
 		}
-		// GNOME Software automatic updates check for Fedora/RHEL
+		// GNOME Software automatic updates check for Fedora/RHEL - only this sets autoUpdateEnabled
 		if output, err := c.RunCommand("gsettings get org.gnome.software download-updates"); err == nil {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"gnomeSoftwareDownloadUpdates": output})
 			if output == "true" {
@@ -179,7 +184,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"recentPackages": output})
 		}
 	} else {
-		// APT automatic updates for Debian/Ubuntu
+		// APT automatic updates for Debian/Ubuntu - keep existing behavior for non-RPM distros
 		if result, err := c.queryFirst("SELECT COUNT(*) AS passed FROM file WHERE path = '/etc/apt/apt.conf.d/50unattended-upgrades'"); err == nil && result != nil {
 			rawResults["autoUpdateEnabled"] = result
 		}
@@ -195,25 +200,11 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 	}
 	rawResults["autoUpdateSettings"] = autoUpdateSettings
 
-	// Screen Lock Status - works for any user with GNOME
+	// Screen Lock Status - only check idle-delay for Fedora/RHEL Gnome
 	screenLockStatus := make([]interface{}, 0)
-	// Use DBUS_SESSION_BUS_ADDRESS from environment if available
-	if output, err := c.RunCommand("gsettings get org.gnome.desktop.screensaver lock-delay"); err == nil {
-		screenLockStatus = append(screenLockStatus, map[string]string{"lockDelay": output})
-	}
-	if output, err := c.RunCommand("gsettings get org.gnome.desktop.screensaver lock-enabled"); err == nil {
-		screenLockStatus = append(screenLockStatus, map[string]string{"lockEnabled": output})
-	}
-	// Check idle-delay from org.gnome.desktop.session for Fedora/RHEL Gnome
+	// Check idle-delay from org.gnome.desktop.session for Fedora/RHEL Gnome - this is the only check
 	if output, err := c.RunCommand("gsettings get org.gnome.desktop.session idle-delay"); err == nil {
 		screenLockStatus = append(screenLockStatus, map[string]string{"idleDelay": output})
-	}
-	// Also check KDE Plasma settings for Fedora KDE spin
-	if output, err := c.RunCommand("kreadconfig5 --file kscreenlockerrc --group Daemon --key Autolock"); err == nil && output != "" {
-		screenLockStatus = append(screenLockStatus, map[string]string{"kdeAutolock": output})
-	}
-	if output, err := c.RunCommand("kreadconfig5 --file kscreenlockerrc --group Daemon --key Timeout"); err == nil && output != "" {
-		screenLockStatus = append(screenLockStatus, map[string]string{"kdeTimeout": output})
 	}
 	rawResults["screenLockStatus"] = screenLockStatus
 
