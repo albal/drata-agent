@@ -149,6 +149,11 @@ export class UbuntuSystemQueryService
                         command:
                             'gsettings get org.gnome.desktop.screensaver lock-enabled',
                     },
+                    {
+                        description: 'Idle delay for screen lock',
+                        command:
+                            'gsettings get org.gnome.desktop.session idle-delay',
+                    },
                 ]),
 
                 locationServices: await this.runQuery({
