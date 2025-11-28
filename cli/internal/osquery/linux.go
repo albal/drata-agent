@@ -81,7 +81,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 	}
 
 	// Antivirus Check - check for clamtk (ClamAV GUI) on Fedora/RHEL
-	antivirusStatus := make(map[string]interface{})
+	antivirusStatus := map[string]interface{}{"passed": false}
 	if c.isRPMBasedDistro() {
 		// Check if clamtk is installed via RPM
 		if output, err := c.RunCommand("rpm -q clamtk"); err == nil && output != "" {
@@ -101,7 +101,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 		}
 	} else {
 		// Check for clamtk on Debian/Ubuntu
-		if output, err := c.RunCommand("dpkg -l clamtk 2>&1 | grep -E '^ii'"); err == nil && output != "" {
+		if output, err := c.RunCommand("dpkg -l clamtk | grep -E '^ii'"); err == nil && output != "" {
 			antivirusStatus["clamtk"] = map[string]interface{}{
 				"installed": true,
 				"version":   output,
@@ -109,7 +109,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			antivirusStatus["passed"] = true
 		}
 		// Also check for clamav
-		if output, err := c.RunCommand("dpkg -l clamav 2>&1 | grep -E '^ii'"); err == nil && output != "" {
+		if output, err := c.RunCommand("dpkg -l clamav | grep -E '^ii'"); err == nil && output != "" {
 			antivirusStatus["clamav"] = map[string]interface{}{
 				"installed": true,
 				"version":   output,
