@@ -229,31 +229,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			rawResults["autoUpdateEnabled"] = map[string]interface{}{"passed": 1}
 		}
 	}
-	// Collect additional distro-specific update settings for informational purposes
-	if c.isRPMBasedDistro() {
-		if output, err := c.RunCommand("systemctl is-enabled dnf-automatic.timer || systemctl is-enabled yum-cron"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"autoUpdateService": output})
-		}
-		if output, err := c.RunCommand("dnf history list --last 10 || yum history list last 10"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"recentUpdates": output})
-		}
-		if output, err := c.RunCommand("cat /etc/dnf/automatic.conf || cat /etc/yum/yum-cron.conf"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"autoUpdateConfig": output})
-		}
-		if output, err := c.RunCommand("rpm -q --last | head -20"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"recentPackages": output})
-		}
-	} else {
-		if output, err := c.RunCommand("apt-config dump | grep -E '^(APT::Periodic|Unattended-Upgrade)::'"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"aptConfig": output})
-		}
-		if output, err := c.RunCommand("systemctl show apt-daily* --property=NextElapseUSecMonotonic,NextElapseUSecRealtime,Unit,Description,UnitFileState,LastTriggerUSec"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"aptDailyStatus": output})
-		}
-		if output, err := c.RunCommand("journalctl --user -u apt-daily.service -u apt-daily-upgrade.service --since -7day -n 10 --no-pager --quiet || journalctl -u apt-daily.service -u apt-daily-upgrade.service --since -7day -n 10 --no-pager --quiet"); err == nil {
-			autoUpdateSettings = append(autoUpdateSettings, map[string]string{"aptDailyLogs": output})
-		}
-	}
+
 	rawResults["autoUpdateSettings"] = autoUpdateSettings
 
 	// Screen Lock Status - only check idle-delay for Fedora/RHEL Gnome
