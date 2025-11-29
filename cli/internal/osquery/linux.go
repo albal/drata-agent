@@ -1,9 +1,60 @@
 package osquery
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode"
 )
+
+func isValidSessionUser(user string) bool {
+	if user == "" || user == "root" {
+		return false
+	}
+	for _, r := range user {
+		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Client) getDesktopSessionUser() string {
+	candidates := []string{
+		os.Getenv("SUDO_USER"),
+		os.Getenv("LOGNAME"),
+		os.Getenv("USER"),
+	}
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if isValidSessionUser(candidate) {
+			return candidate
+		}
+	}
+	if output, err := c.RunCommand("logname"); err == nil {
+		candidate := strings.TrimSpace(output)
+		if isValidSessionUser(candidate) {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func (c *Client) runGsettingsCommand(args string) (string, error) {
+	baseCmd := fmt.Sprintf("gsettings %s", args)
+	user := c.getDesktopSessionUser()
+	if user == "" {
+		return c.RunCommand(baseCmd)
+	}
+
+	userCmd := fmt.Sprintf("uid=$(id -u %[1]s) && sudo -u %[1]s env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus %s", user, baseCmd)
+	if output, err := c.RunCommand(userCmd); err == nil {
+		return output, nil
+	}
+
+	return c.RunCommand(baseCmd)
+}
 
 // isRPMBasedDistro checks if the system is RPM-based (Fedora/RHEL/CentOS).
 func (c *Client) isRPMBasedDistro() bool {
@@ -101,13 +152,24 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			antivirusStatus["passed"] = true
 		}
 	}
-	// Check for clamtk/clamav installed via Flatpak
-	if output, err := c.RunCommand("flatpak list --app | grep -i clam"); err == nil && output != "" {
-		antivirusStatus["flatpak"] = map[string]interface{}{
-			"installed": true,
-			"version":   output,
+	// Check for clamtk/clamav installed via Flatpak (system or user scope)
+	flatpakScopes := []struct {
+		label   string
+		command string
+	}{
+		{"system", "flatpak list --app --system | grep -i clam"},
+		{"user", "flatpak list --app --user | grep -i clam"},
+	}
+	for _, scope := range flatpakScopes {
+		if output, err := c.RunCommand(scope.command); err == nil && output != "" {
+			antivirusStatus["flatpak"] = map[string]interface{}{
+				"installed": true,
+				"scope":     scope.label,
+				"details":   output,
+			}
+			antivirusStatus["passed"] = true
+			break
 		}
-		antivirusStatus["passed"] = true
 	}
 	rawResults["antivirusStatus"] = antivirusStatus
 
@@ -117,7 +179,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 		homeDir = "/root"
 	}
 	extensions := make([]interface{}, 0)
-	
+
 	// Firefox addons - check user profile directory
 	firefoxPath := filepath.Join(homeDir, ".mozilla", "firefox")
 	if _, err := os.Stat(firefoxPath); err == nil {
@@ -127,7 +189,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 			}
 		}
 	}
-	
+
 	// Chrome extensions - check user profile directory
 	chromePath := filepath.Join(homeDir, ".config", "google-chrome")
 	if _, err := os.Stat(chromePath); err == nil {
@@ -147,7 +209,7 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 	// Auto Update Settings - use only gsettings for autoUpdateEnabled check
 	autoUpdateSettings := make([]interface{}, 0)
 	// GNOME Software automatic updates check - only this sets autoUpdateEnabled
-	if output, err := c.RunCommand("gsettings get org.gnome.software download-updates"); err == nil {
+	if output, err := c.runGsettingsCommand("get org.gnome.software download-updates"); err == nil {
 		autoUpdateSettings = append(autoUpdateSettings, map[string]string{"gnomeSoftwareDownloadUpdates": output})
 		if output == "true" {
 			rawResults["autoUpdateEnabled"] = map[string]interface{}{"passed": 1}
@@ -183,27 +245,27 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 	// Screen Lock Status - only check idle-delay for Fedora/RHEL Gnome
 	screenLockStatus := make([]interface{}, 0)
 	// Check idle-delay from org.gnome.desktop.session for Fedora/RHEL Gnome - this is the only check
-	if output, err := c.RunCommand("gsettings get org.gnome.desktop.session idle-delay"); err == nil {
+	if output, err := c.runGsettingsCommand("get org.gnome.desktop.session idle-delay"); err == nil {
 		screenLockStatus = append(screenLockStatus, map[string]string{"idleDelay": output})
 	}
 	rawResults["screenLockStatus"] = screenLockStatus
 
 	// Location Services
 	locationServices := make(map[string]interface{})
-	if output, err := c.RunCommand("gsettings get org.gnome.system.location enabled"); err == nil {
+	if output, err := c.runGsettingsCommand("get org.gnome.system.location enabled"); err == nil {
 		locationServices["gnomeLocation"] = output
 	}
 	rawResults["locationServices"] = locationServices
 
 	// Screen Lock Settings - use gsettings which works for current user
 	screenLockSettings := make(map[string]interface{})
-	if output, err := c.RunCommand("gsettings list-recursively org.gnome.settings-daemon.plugins.power"); err == nil && output != "" {
+	if output, err := c.runGsettingsCommand("list-recursively org.gnome.settings-daemon.plugins.power"); err == nil && output != "" {
 		screenLockSettings["powerSettings"] = output
 	}
-	if output, err := c.RunCommand("gsettings list-recursively org.gnome.desktop.screensaver"); err == nil && output != "" {
+	if output, err := c.runGsettingsCommand("list-recursively org.gnome.desktop.screensaver"); err == nil && output != "" {
 		screenLockSettings["screenSettings"] = output
 	}
-	if output, err := c.RunCommand("gsettings list-recursively org.gnome.desktop.session"); err == nil && output != "" {
+	if output, err := c.runGsettingsCommand("list-recursively org.gnome.desktop.session"); err == nil && output != "" {
 		screenLockSettings["sessionSettings"] = output
 	}
 	rawResults["screenLockSettings"] = screenLockSettings
