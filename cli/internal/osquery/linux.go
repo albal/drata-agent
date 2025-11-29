@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -54,6 +55,19 @@ func (c *Client) runGsettingsCommand(args string) (string, error) {
 	}
 
 	return c.RunCommand(baseCmd)
+}
+
+func parseGsettingsUint(output string) (int, error) {
+	value := strings.TrimSpace(output)
+	if value == "" {
+		return 0, fmt.Errorf("empty gsettings output")
+	}
+	// gsettings often returns "uint32 300"; take the last token as numeric value
+	parts := strings.Fields(value)
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid gsettings output: %s", output)
+	}
+	return strconv.Atoi(parts[len(parts)-1])
 }
 
 // isRPMBasedDistro checks if the system is RPM-based (Fedora/RHEL/CentOS).
@@ -244,9 +258,13 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 
 	// Screen Lock Status - only check idle-delay for Fedora/RHEL Gnome
 	screenLockStatus := make([]interface{}, 0)
-	// Check idle-delay from org.gnome.desktop.session for Fedora/RHEL Gnome - this is the only check
-	if output, err := c.runGsettingsCommand("get org.gnome.desktop.session idle-delay"); err == nil {
-		screenLockStatus = append(screenLockStatus, map[string]string{"idleDelay": output})
+	// Check lock-delay from org.gnome.desktop.screensaver to ensure lock engages quickly
+	if output, err := c.runGsettingsCommand("get org.gnome.desktop.screensaver lock-delay"); err == nil {
+		if seconds, parseErr := parseGsettingsUint(output); parseErr == nil {
+			screenLockStatus = append(screenLockStatus, map[string]interface{}{"lockDelaySeconds": seconds})
+		} else {
+			screenLockStatus = append(screenLockStatus, map[string]string{"lockDelay": output})
+		}
 	}
 	rawResults["screenLockStatus"] = screenLockStatus
 
