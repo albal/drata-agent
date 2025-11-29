@@ -258,6 +258,14 @@ func (c *Client) getLinuxSystemInfo(version string) (*QueryResult, error) {
 
 	// Screen Lock Status - only check idle-delay for Fedora/RHEL Gnome
 	screenLockStatus := make([]interface{}, 0)
+	// Capture idle-delay from org.gnome.desktop.session so we know when the screen saver triggers
+	if output, err := c.runGsettingsCommand("get org.gnome.desktop.session idle-delay"); err == nil {
+		if seconds, parseErr := parseGsettingsUint(output); parseErr == nil {
+			screenLockStatus = append(screenLockStatus, map[string]interface{}{"idleDelaySeconds": seconds})
+		} else {
+			screenLockStatus = append(screenLockStatus, map[string]string{"idleDelay": output})
+		}
+	}
 	// Check lock-delay from org.gnome.desktop.screensaver to ensure lock engages quickly
 	if output, err := c.runGsettingsCommand("get org.gnome.desktop.screensaver lock-delay"); err == nil {
 		if seconds, parseErr := parseGsettingsUint(output); parseErr == nil {
